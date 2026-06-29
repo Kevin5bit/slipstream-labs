@@ -33,7 +33,7 @@ enum Model3DFormat {
 
 model Team {
   id          String   @id @default(cuid())
-  name        String
+  name        String   @unique
   fullName    String
   nationality String
   logoUrl     String
@@ -53,6 +53,8 @@ model GrandPrix {
   date    DateTime
 
   upgrades Upgrade[]
+
+  @@unique([season, round])
 }
 
 model Component {
@@ -78,9 +80,9 @@ model Upgrade {
   createdAt      DateTime      @default(now())
   updatedAt      DateTime      @updatedAt
 
-  team      Team      @relation(fields: [teamId], references: [id])
-  grandPrix GrandPrix @relation(fields: [grandPrixId], references: [id])
-  component Component @relation(fields: [componentId], references: [id])
+  team      Team      @relation(fields: [teamId], references: [id], onDelete: Restrict)
+  grandPrix GrandPrix @relation(fields: [grandPrixId], references: [id], onDelete: Restrict)
+  component Component @relation(fields: [componentId], references: [id], onDelete: Restrict)
 
   images   UpgradeImage[]
   models3d Model3D[]

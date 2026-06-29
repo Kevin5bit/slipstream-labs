@@ -76,6 +76,13 @@ const teams = [
     logoUrl: "",
     color: "#B6BABD",
   },
+  {
+    name: "Cadillac",
+    fullName: "Cadillac Formula 1 Team",
+    nationality: "USA",
+    logoUrl: "",
+    color: "#000000", // 2026 official livery: bicolor white/black
+  },
 ];
 
 const components = [
@@ -87,11 +94,17 @@ const components = [
 ];
 
 async function main() {
-  // Idempotency: wipe teams (no upgrades depend on them yet).
-  await prisma.team.deleteMany();
-
   for (const t of teams) {
-    await prisma.team.create({ data: t });
+    await prisma.team.upsert({
+      where: { name: t.name },
+      update: {
+        fullName: t.fullName,
+        nationality: t.nationality,
+        logoUrl: t.logoUrl,
+        color: t.color,
+      },
+      create: t,
+    });
   }
 
   for (const c of components) {
