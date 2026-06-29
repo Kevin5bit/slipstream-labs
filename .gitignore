@@ -39,3 +39,8 @@ build/
 # OS
 .DS_Store
 Thumbs.db
+
+# Web (Next.js + Prisma generated artifacts)
+web/node_modules/
+web/.next/
+web/src/generated/

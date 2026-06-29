@@ -1,0 +1,123 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum ComponentCategory {
+  FRONT_WING
+  REAR_WING
+  SIDEPOD
+  FLOOR
+  BEAM_WING
+  OTHER
+}
+
+enum UpgradeStatus {
+  RUMORED
+  CONFIRMED
+  ANALYZED
+}
+
+enum Model3DFormat {
+  GLB
+  FBX
+  OBJ
+}
+
+model Team {
+  id          String   @id @default(cuid())
+  name        String
+  fullName    String
+  nationality String
+  logoUrl     String
+  color       String // hex string, e.g. "#FF1801"
+  createdAt   DateTime @default(now())
+
+  upgrades Upgrade[]
+}
+
+model GrandPrix {
+  id      String   @id @default(cuid())
+  name    String
+  season  Int
+  round   Int
+  circuit String
+  country String
+  date    DateTime
+
+  upgrades Upgrade[]
+}
+
+model Component {
+  id          String            @id @default(cuid())
+  slug        String            @unique
+  name        String
+  category    ComponentCategory
+  description String?           @db.Text
+
+  upgrades Upgrade[]
+  models3d Model3D[]
+}
+
+model Upgrade {
+  id             String        @id @default(cuid())
+  teamId         String
+  grandPrixId    String
+  componentId    String
+  title          String
+  statedObjective String       @db.Text
+  observedEffect String        @db.Text
+  status         UpgradeStatus
+  createdAt      DateTime      @default(now())
+  updatedAt      DateTime      @updatedAt
+
+  team      Team      @relation(fields: [teamId], references: [id])
+  grandPrix GrandPrix @relation(fields: [grandPrixId], references: [id])
+  component Component @relation(fields: [componentId], references: [id])
+
+  images   UpgradeImage[]
+  models3d Model3D[]
+
+  @@index([teamId])
+  @@index([grandPrixId])
+  @@index([componentId])
+}
+
+model UpgradeImage {
+  id        String  @id @default(cuid())
+  upgradeId String
+  url       String
+  caption   String?
+  source    String?
+  sortOrder Int
+
+  upgrade Upgrade @relation(fields: [upgradeId], references: [id])
+
+  @@index([upgradeId])
+}
+
+model Model3D {
+  id           String        @id @default(cuid())
+  upgradeId    String?
+  componentId  String?
+  label        String // e.g. "before" / "after" / "detail"
+  fileUrl      String
+  thumbnailUrl String?
+  format       Model3DFormat
+  sourceTool   String        @default("meshy")
+  meshyTaskId  String?
+  createdAt    DateTime      @default(now())
+
+  upgrade   Upgrade?   @relation(fields: [upgradeId], references: [id])
+  component Component? @relation(fields: [componentId], references: [id])
+
+  @@index([upgradeId])
+  @@index([componentId])
+}
