@@ -1,6 +1,5 @@
 "use client";
-import React from "react";
-import "@google/model-viewer";
+import React, { useEffect } from "react";
 
 interface ModelViewerProps {
   src: string;
@@ -17,6 +16,12 @@ export function ModelViewer({
   autoRotate = true,
   disablePan = false,
 }: ModelViewerProps) {
+  // model-viewer references `self` at import time, which breaks SSR:
+  // register the custom element in the browser only.
+  useEffect(() => {
+    import("@google/model-viewer");
+  }, []);
+
   return (
     <div className="w-full h-96 bg-gray-900 rounded-lg overflow-hidden">
       {/* @ts-expect-error — model-viewer is a custom element without full TS types */}

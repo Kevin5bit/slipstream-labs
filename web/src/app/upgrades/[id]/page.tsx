@@ -1,5 +1,6 @@
 "use client";
 import { use, useEffect, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
   Card,
@@ -104,10 +105,19 @@ export default function UpgradeDetailPage({
 
   return (
     <div className="container mx-auto p-8">
-      {/* Back button */}
-      <Button variant="outline" className="mb-6" onClick={() => router.back()}>
-        ← Back to Upgrades
-      </Button>
+      {/* Back + Upload actions */}
+      <div className="flex gap-2 mb-6">
+        <Button variant="outline" onClick={() => router.back()}>
+          ← Back to Upgrades
+        </Button>
+        <Button
+          variant="default"
+          nativeButton={false}
+          render={<Link href={`/upgrades/${id}/upload`} />}
+        >
+          + Upload Model
+        </Button>
+      </div>
 
       {/* Header */}
       <Card className="mb-8">
