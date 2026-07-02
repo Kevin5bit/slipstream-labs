@@ -1,91 +1,156 @@
-# Supabase Storage: Modelli 3D e Asset
+# Supabase Storage: 3D Models & Assets
 
-Policy di storage per tutti i file binari del progetto (modelli 3D, immagini, loghi).
-I binari **non vivono mai in git** (vedi `docs/CONVENTIONS.md` §3): vivono su Supabase Storage
-e il database li referenzia tramite URL (`Model3D.fileUrl`, `UpgradeImage.url`, `Team.logoUrl`).
+## Overview
+
+Gestisce asset non-testuali: modelli 3D (Meshy AI), foto upgrade, loghi team.
+Nessun file binario va in git — tutti vanno su Storage, il DB traccia i reference (URL).
 
 ## Bucket Structure
 
 ```
 storage/
-├── models3d/           (modelli 3D Meshy AI, .glb/.fbx)
-│   ├── public/         (URL pubblici, visualizzazione)
-│   └── uploads/        (intake dai form upload)
-├── images/             (upgrade images, foto circuiti)
-└── logos/              (team logos)
+├── models3d/
+│   └── public/         (modelli 3D, pubblici in lettura, privati in scrittura)
+└── images/
+    ├── upgrades/       (foto associate a upgrade)
+    └── team-logos/     (loghi team)
 ```
 
-| Bucket / path        | Contenuto                                   | Visibilità |
-|----------------------|---------------------------------------------|------------|
-| `models3d/public/`   | Modelli 3D pronti per la visualizzazione    | Pubblica   |
-| `models3d/uploads/`  | Staging: file in ingresso da form upload    | Privata    |
-| `images/`            | Immagini upgrade, foto circuiti             | Pubblica   |
-| `logos/`             | Loghi team                                  | Pubblica   |
+## RLS Policy: models3d/public (Ibrido)
 
-## RLS Policy (Ibrido)
+**Goal:** Chiunque vede i modelli (URL pubblico); solo autenticati li caricano/modificano.
 
-### models3d/public — PUBLIC READ, AUTHENTICATED WRITE
+### Policy: Allow PUBLIC SELECT
 
-**Lettura (SELECT):**
-- `auth.role() = 'anon'` → permesso (chiunque può visualizzare)
-
-**Creazione (INSERT):**
-- `auth.role() = 'authenticated'` → permesso (solo utenti autenticati possono uploadare)
-
-**Aggiornamento (UPDATE):**
-- `auth.role() = 'authenticated' AND auth.uid() = owner_id` → permesso (solo chi ha uploadato)
-
-**Cancellazione (DELETE):**
-- `auth.role() = 'authenticated' AND auth.uid() = owner_id` → permesso
-
-### models3d/uploads — PRIVATE (dev only)
-
-Staging area per file in processing. Non accessibile da frontend.
-
-## URL e Accesso
-
-**Public file:**
-
-```
-https://<project-id>.supabase.co/storage/v1/object/public/models3d/public/<filename>.glb
+```sql
+CREATE POLICY "Allow anonymous read" ON storage.objects
+  FOR SELECT USING (
+    bucket_id = 'models3d' AND auth.role() = 'anon'
+  );
 ```
 
-Accessibile direttamente, no token richiesto.
+→ Chiunque (no login) scarica `.glb` via URL pubblico.
 
-**Private file (authenticated users only):**
+### Policy: Allow AUTHENTICATED INSERT/UPDATE/DELETE
+
+```sql
+CREATE POLICY "Allow authenticated upload" ON storage.objects
+  FOR INSERT WITH CHECK (
+    bucket_id = 'models3d'
+    AND auth.role() = 'authenticated'
+    AND (storage.foldername(name))[1] = 'public'
+  );
+
+-- Nota: Postgres non supporta "FOR UPDATE, DELETE" in una singola policy:
+-- servono due policy separate, una per comando.
+CREATE POLICY "Allow authenticated update own files" ON storage.objects
+  FOR UPDATE USING (
+    bucket_id = 'models3d'
+    AND auth.role() = 'authenticated'
+    AND owner_id = auth.uid()
+  );
+
+CREATE POLICY "Allow authenticated delete own files" ON storage.objects
+  FOR DELETE USING (
+    bucket_id = 'models3d'
+    AND auth.role() = 'authenticated'
+    AND owner_id = auth.uid()
+  );
+```
+
+→ Solo utenti loggati possono upload/modifica nella cartella `public/`.
+
+## URL Structure
+
+**Public file (accessible without auth):**
 
 ```
-https://<project-id>.supabase.co/storage/v1/object/authenticated/models3d/private/<filename>.glb
+https://<project_id>.supabase.co/storage/v1/object/public/models3d/public/<filename>.glb
 ```
 
-Richiede Authorization header con token JWT.
+**Signed URL (per file privati, non necessario qui):**
 
-## Naming Convention
+```ts
+const { data } = await supabase.storage
+  .from("models3d")
+  .createSignedUrl("private/file.glb", 3600); // URL valido 1h, richiede token JWT
+```
 
-File names: `<upgrade-id>_<component-slug>_<label>.<format>`
+## File Naming Convention
 
-Esempi:
-- `upgrade_ferrari_2026r5_rear-wing_before.glb`
-- `upgrade_mclaren_2026r12_floor_after.fbx`
+```
+models3d/public/<upgrade_id>_<label>.<format>
+```
 
-Metadata: salva in DB table `Model3D` il percorso relativo + URL completo pubblico.
+Esempi (con gli upgrade id deterministici del seed):
+
+- `seed-upgrade-red-bull-2026r1-front-wing_before.glb`
+- `seed-upgrade-ferrari-2026r5-rear-wing_after.fbx`
+- `seed-upgrade-mclaren-2026r12-floor_detail.obj`
+
+**Vantaggi:**
+
+- Upgrade ID deterministico (da seed)
+- Label (before/after/detail)
+- Facile deduplica se stesso upgrade carica 2 volte
+
+## Database Reference: Model3D
+
+Ogni riga in `Model3D` (da `prisma/schema.prisma`):
+
+```prisma
+model Model3D {
+  id           String        @id @default(cuid())
+  upgradeId    String?                          // relazione opzionale a Upgrade
+  componentId  String?                          // relazione opzionale a Component
+  label        String                           // "before", "after", "detail"
+  fileUrl      String                           // URL completo pubblico
+  thumbnailUrl String?                          // preview (opzionale)
+  format       Model3DFormat                    // GLB, FBX, OBJ
+  sourceTool   String        @default("meshy")  // "meshy", "fusion", "blender"
+  meshyTaskId  String?                          // ID task Meshy AI (traccia origine)
+  createdAt    DateTime      @default(now())
+}
+```
+
+→ `fileUrl` è sempre il percorso pubblico completo (per poterlo incollare in `<model-viewer src="..." />`).
 
 ## Upload Flow (Next.js)
 
-1. Form `/upgrades/new` → user seleziona `.glb` da Meshy AI
-2. Route handler `POST /api/upload` → valida, salva su Storage, crea record `Model3D` in DB
-3. Redirect a `/upgrades/[id]` → ModelViewer carica da URL pubblico
+1. **User at `/upgrades/[id]/upload`**
+   - Seleziona file `.glb` da disco (scaricato da Meshy AI)
+   - Sceglie label (before/after/detail)
+   - Clicca "Upload"
+
+2. **POST /api/upload**
+   - Riceve FormData (file + upgradeId + label)
+   - Valida: file.size < 50MB, file.type = "application/gltf-binary"
+   - Genera filename deterministico: `{upgradeId}_{label}.{format}`
+   - Upload a `models3d/public/{filename}` via SDK Supabase
+   - Crea record Model3D in DB con fileUrl completo
+   - Ritorna JSON: `{ success: true, model: { id, fileUrl, ... } }`
+
+3. **Redirect a `/upgrades/[id]`**
+   - ModelViewer carica il nuovo modello via URL pubblico
 
 ## Testing
 
 ```bash
-# Lista files in bucket
-supabase list storage buckets
+# List bucket
+supabase storage ls models3d
 
-# Crea file dummy
-echo "test" > test.glb
-supabase upload models3d/public/test.glb
+# Local test: upload file dummy
+curl -X POST https://<project>.supabase.co/storage/v1/object/models3d/public/test.glb \
+  -H "Authorization: Bearer $ANON_KEY" \
+  -H "Content-Type: application/gltf-binary" \
+  --data-binary @test.glb
 
-# Download public file (curl)
-curl https://<project-id>.supabase.co/storage/v1/object/public/models3d/public/test.glb
+# Verify public read
+curl https://<project>.supabase.co/storage/v1/object/public/models3d/public/test.glb
 ```
+
+## Notes
+
+- RLS policies applicate a livello Supabase (Security → Policies in dashboard).
+- Non serve custom auth logic in Next.js per questo workflow (Supabase gestisce via RLS).
+- Opzione futura: aggiungere una cartella `models3d/private/` se vuoi modelli solo per team/admin.
