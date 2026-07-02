@@ -93,6 +93,185 @@ const components = [
   { slug: "beam-wing", name: "Beam Wing", category: "BEAM_WING" as const },
 ];
 
+const grandPrixData = [
+  {
+    name: "Australian Grand Prix",
+    season: 2026,
+    round: 1,
+    circuit: "Albert Park Circuit",
+    country: "Australia",
+    date: new Date("2026-03-08"),
+  },
+  {
+    name: "Chinese Grand Prix",
+    season: 2026,
+    round: 2,
+    circuit: "Shanghai International Circuit",
+    country: "China",
+    date: new Date("2026-03-15"),
+  },
+  {
+    name: "Japanese Grand Prix",
+    season: 2026,
+    round: 3,
+    circuit: "Suzuka Circuit",
+    country: "Japan",
+    date: new Date("2026-03-29"),
+  },
+  {
+    name: "Miami Grand Prix",
+    season: 2026,
+    round: 4,
+    circuit: "Miami International Autodrome",
+    country: "USA",
+    date: new Date("2026-05-03"),
+  },
+  {
+    name: "Canadian Grand Prix",
+    season: 2026,
+    round: 5,
+    circuit: "Circuit Gilles Villeneuve",
+    country: "Canada",
+    date: new Date("2026-05-24"),
+  },
+  {
+    name: "Monaco Grand Prix",
+    season: 2026,
+    round: 6,
+    circuit: "Circuit de Monaco",
+    country: "Monaco",
+    date: new Date("2026-06-07"),
+  },
+  {
+    name: "Barcelona-Catalunya Grand Prix",
+    season: 2026,
+    round: 7,
+    circuit: "Circuit de Barcelona-Catalunya",
+    country: "Spain",
+    date: new Date("2026-06-14"),
+  },
+  {
+    name: "Austrian Grand Prix",
+    season: 2026,
+    round: 8,
+    circuit: "Red Bull Ring",
+    country: "Austria",
+    date: new Date("2026-06-28"),
+  },
+  {
+    name: "British Grand Prix",
+    season: 2026,
+    round: 9,
+    circuit: "Silverstone Circuit",
+    country: "UK",
+    date: new Date("2026-07-05"),
+  },
+  {
+    name: "Hungarian Grand Prix",
+    season: 2026,
+    round: 10,
+    circuit: "Hungaroring",
+    country: "Hungary",
+    date: new Date("2026-07-26"),
+  },
+  {
+    name: "Belgian Grand Prix",
+    season: 2026,
+    round: 11,
+    circuit: "Circuit de Spa-Francorchamps",
+    country: "Belgium",
+    date: new Date("2026-08-02"),
+  },
+  {
+    name: "Dutch Grand Prix",
+    season: 2026,
+    round: 12,
+    circuit: "Circuit Zandvoort",
+    country: "Netherlands",
+    date: new Date("2026-08-23"),
+  },
+  {
+    name: "Italian Grand Prix",
+    season: 2026,
+    round: 13,
+    circuit: "Autodromo Nazionale di Monza",
+    country: "Italy",
+    date: new Date("2026-09-06"),
+  },
+  {
+    name: "Madrid Grand Prix",
+    season: 2026,
+    round: 14,
+    circuit: "Circuit de Madrid",
+    country: "Spain",
+    date: new Date("2026-09-13"),
+  },
+  {
+    name: "Azerbaijan Grand Prix",
+    season: 2026,
+    round: 15,
+    circuit: "Baku City Circuit",
+    country: "Azerbaijan",
+    date: new Date("2026-09-26"),
+  },
+  {
+    name: "Singapore Grand Prix",
+    season: 2026,
+    round: 16,
+    circuit: "Marina Bay Circuit",
+    country: "Singapore",
+    date: new Date("2026-10-11"),
+  },
+  {
+    name: "United States Grand Prix",
+    season: 2026,
+    round: 17,
+    circuit: "Circuit of The Americas",
+    country: "USA",
+    date: new Date("2026-10-25"),
+  },
+  {
+    name: "Mexico City Grand Prix",
+    season: 2026,
+    round: 18,
+    circuit: "Autódromo Hermanos Rodríguez",
+    country: "Mexico",
+    date: new Date("2026-11-01"),
+  },
+  {
+    name: "Brazilian Grand Prix",
+    season: 2026,
+    round: 19,
+    circuit: "Autódromo José Carlos Pace (Interlagos)",
+    country: "Brazil",
+    date: new Date("2026-11-08"),
+  },
+  {
+    name: "Las Vegas Grand Prix",
+    season: 2026,
+    round: 20,
+    circuit: "Las Vegas Strip Circuit",
+    country: "USA",
+    date: new Date("2026-11-21"),
+  },
+  {
+    name: "Qatar Grand Prix",
+    season: 2026,
+    round: 21,
+    circuit: "Lusail International Circuit",
+    country: "Qatar",
+    date: new Date("2026-11-29"),
+  },
+  {
+    name: "Abu Dhabi Grand Prix",
+    season: 2026,
+    round: 22,
+    circuit: "Yas Marina Circuit",
+    country: "UAE",
+    date: new Date("2026-12-06"),
+  },
+];
+
 async function main() {
   for (const t of teams) {
     await prisma.team.upsert({
@@ -114,6 +293,17 @@ async function main() {
       create: c,
     });
   }
+
+  // Upsert: popola GrandPrix se non esiste (idempotente)
+  for (const gp of grandPrixData) {
+    await prisma.grandPrix.upsert({
+      where: { season_round: { season: gp.season, round: gp.round } },
+      update: {}, // nessun aggiornamento se esiste già
+      create: gp,
+    });
+  }
+
+  console.log(`✅ Seeded ${grandPrixData.length} Grand Prix for 2026 season`);
 
   const teamCount = await prisma.team.count();
   const componentCount = await prisma.component.count();
