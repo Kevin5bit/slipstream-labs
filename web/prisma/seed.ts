@@ -305,6 +305,76 @@ async function main() {
 
   console.log(`✅ Seeded ${grandPrixData.length} Grand Prix for 2026 season`);
 
+  // Upgrade fasulli per test (stage: RUMORED, CONFIRMED, ANALYZED).
+  // Id deterministici per mantenere l'upsert idempotente.
+  const upgradeData = [
+    {
+      id: "seed-upgrade-ferrari-2026r5-rear-wing",
+      teamName: "Ferrari",
+      season: 2026,
+      round: 5,
+      componentSlug: "rear-wing",
+      title: "Ferrari Rear Wing Update",
+      statedObjective: "Increase downforce in high-speed corners",
+      observedEffect: "5 km/h gain in top speed, better stability turn 13",
+      status: "CONFIRMED" as const,
+    },
+    {
+      id: "seed-upgrade-mclaren-2026r12-floor",
+      teamName: "McLaren",
+      season: 2026,
+      round: 12,
+      componentSlug: "floor",
+      title: "McLaren Floor Upgrade",
+      statedObjective: "Reduce drag coefficient",
+      observedEffect: "Estimated 0.8% drag reduction",
+      status: "ANALYZED" as const,
+    },
+    {
+      id: "seed-upgrade-red-bull-2026r1-front-wing",
+      teamName: "Red Bull Racing",
+      season: 2026,
+      round: 1,
+      componentSlug: "front-wing",
+      title: "Red Bull Front Wing Sprint Config",
+      statedObjective: "Sprint race optimization",
+      observedEffect: "Better traction out of slow corners",
+      status: "RUMORED" as const,
+    },
+  ];
+
+  for (const u of upgradeData) {
+    const [team, component, gp] = await Promise.all([
+      prisma.team.findUnique({ where: { name: u.teamName } }),
+      prisma.component.findUnique({ where: { slug: u.componentSlug } }),
+      prisma.grandPrix.findUnique({
+        where: { season_round: { season: u.season, round: u.round } },
+      }),
+    ]);
+
+    if (!team || !component || !gp) {
+      console.warn(`⚠️ Skipping upgrade "${u.title}": missing relation`);
+      continue;
+    }
+
+    await prisma.upgrade.upsert({
+      where: { id: u.id },
+      update: {},
+      create: {
+        id: u.id,
+        teamId: team.id,
+        grandPrixId: gp.id,
+        componentId: component.id,
+        title: u.title,
+        statedObjective: u.statedObjective,
+        observedEffect: u.observedEffect,
+        status: u.status,
+      },
+    });
+  }
+
+  console.log(`✅ Seeded ${upgradeData.length} test upgrades`);
+
   const teamCount = await prisma.team.count();
   const componentCount = await prisma.component.count();
   console.log(`Seeded: ${teamCount} teams, ${componentCount} components.`);
