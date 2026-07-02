@@ -1,3 +1,4 @@
 # Storage
 
-<!-- Placeholder: documentazione storage file binari (modelli 3D, asset pesanti) -->
+La documentazione completa dello storage (bucket Supabase, RLS policy, formato URL)
+vive in [`web/docs/STORAGE.md`](../web/docs/STORAGE.md).
