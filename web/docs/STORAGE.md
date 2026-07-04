@@ -47,14 +47,14 @@ CREATE POLICY "Allow authenticated update own files" ON storage.objects
   FOR UPDATE USING (
     bucket_id = 'models3d'
     AND auth.role() = 'authenticated'
-    AND owner_id = auth.uid()
+    AND owner_id = auth.uid()::text -- owner_id è text, auth.uid() è uuid
   );
 
 CREATE POLICY "Allow authenticated delete own files" ON storage.objects
   FOR DELETE USING (
     bucket_id = 'models3d'
     AND auth.role() = 'authenticated'
-    AND owner_id = auth.uid()
+    AND owner_id = auth.uid()::text -- owner_id è text, auth.uid() è uuid
   );
 ```
 
